@@ -14,7 +14,8 @@ func main() {
 	switch os.Args[1] {
 	case "run":
 		run()
-
+	case "child":
+		child()
 	default:
 		panic("tell an adult")
 	}
@@ -24,10 +25,12 @@ func main() {
 func run() {
 	fmt.Printf("Running %v\n", os.Args[2:])
 
-	cmd := exec.Command(os.Args[2], os.Args[3:]...)
+	cmd := exec.Command("/proc/self/exe", append([]string{"child"}, os.Args[2:]...)...)
+	// wire up stdin, out and err so we can see stuff when we run the cmd
 	cmd.Stdin = os.Stdin
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
+
 	// set namespace
 	// https://man7.org/linux/man-pages/man7/namespaces.7.html
 	// https://itnext.io/chroot-cgroups-and-namespaces-an-overview-37124d995e3d
@@ -48,6 +51,20 @@ func run() {
 
 	syscall.Sethostname([]byte("container"))
 
+}
+
+func child() {
+	fmt.Printf("Running %v\n", os.Args[2:])
+
+	syscall.Sethostname([]byte("container"))
+
+	cmd := exec.Command(os.Args[2], os.Args[3:]...)
+	// wire up stdin, out and err so we can see stuff when we run the cmd
+	cmd.Stdin = os.Stdin
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+
+	must(cmd.Run())
 }
 
 func must(err error) {
