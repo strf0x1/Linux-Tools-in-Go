@@ -4,4 +4,4 @@ This is a simple pseudo-docker clone based on the talk by Liz Rice - Containers 
 
 It works similar to docker run: go run main.go run image <cmd> <params>
 
-There were a few things to fix from the original presentation. It must be run by root to work, although Liz listed a presentation on how to modify it to work in user space. https://speakerdeck.com/lizrice/rootless-containers-from-scratch
+Also implemented the user namespace code listed in this presentation: https://speakerdeck.com/lizrice/rootless-containers-from-scratch

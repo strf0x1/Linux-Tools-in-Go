@@ -36,17 +36,22 @@ func run() {
 	// https://itnext.io/chroot-cgroups-and-namespaces-an-overview-37124d995e3d
 	// https://stackoverflow.com/questions/46450341/chroot-vs-docker
 	// from above.. user namespace (quite new)(2018) which allows a non root user on a host to be mapped with the root user within the container
-	// sounds sketchy
 	// cookie crumbs: https://unit42.paloaltonetworks.com/breaking-docker-via-runc-explaining-cve-2019-5736/
 	// from the source: https://seclists.org/oss-sec/2019/q1/119
 	cmd.SysProcAttr = &syscall.SysProcAttr{
-		Cloneflags:   syscall.CLONE_NEWUTS | syscall.CLONE_NEWPID | syscall.CLONE_NEWNS,
+		Cloneflags: syscall.CLONE_NEWUTS | syscall.CLONE_NEWUSER | syscall.CLONE_NEWPID | syscall.CLONE_NEWNS,
+		UidMappings: []syscall.SysProcIDMap{{
+			ContainerID: 0,
+			HostID:      1000,
+			Size:        1,
+		}},
 		Unshareflags: syscall.CLONE_NEWNS,
 	}
 	// CLONE_NEWUTS = hostname  |  CLONE_NEWPID = new namespace for pids  |  CLONE_NEWNS = new namespace
 	// systemd recursively shares mounts with all other namespaces
 
-	// had to wrap with must() to make work
+	// syscall.CLONE_NEWUSER = create new user namespace. must have UidMappings below as well.
+
 	must(cmd.Run())
 }
 
