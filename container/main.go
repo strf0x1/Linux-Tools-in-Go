@@ -10,9 +10,6 @@ import (
 	"syscall"
 )
 
-// from talk by Liz Rice - Containers From Scratch: https://www.youtube.com/watch?v=8fi7uSYlOdc
-// clone of: 	docker run image <cmd> <params>
-
 func main() {
 	switch os.Args[1] {
 	case "run":
@@ -74,9 +71,7 @@ func child() {
 }
 
 func cg() {
-	// fails right now. /sys/proc does not exist
-	// research where that directory should in ubuntu 20.04. should it be /proc?
-	cgroups := "/sys/proc/cgroup"
+	cgroups := "/sys/fs/cgroup"
 	pids := filepath.Join(cgroups, "pids")
 	err := os.Mkdir(filepath.Join(pids, "failwhale"), 755)
 	if err != nil && !os.IsExist(err) {
