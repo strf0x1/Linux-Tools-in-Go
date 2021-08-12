@@ -2,8 +2,11 @@ package main
 
 import (
 	"fmt"
+	"io/ioutil"
 	"os"
 	"os/exec"
+	"path/filepath"
+	"strconv"
 	"syscall"
 )
 
@@ -23,7 +26,7 @@ func main() {
 }
 
 func run() {
-	fmt.Printf("Running %v\n", os.Args[2:])
+	fmt.Printf("Running %v as %d\n", os.Args[2:], os.Getpid())
 
 	cmd := exec.Command("/proc/self/exe", append([]string{"child"}, os.Args[2:]...)...)
 	// wire up stdin, out and err so we can see stuff when we run the cmd
@@ -40,31 +43,50 @@ func run() {
 	// cookie crumbs: https://unit42.paloaltonetworks.com/breaking-docker-via-runc-explaining-cve-2019-5736/
 	// from the source: https://seclists.org/oss-sec/2019/q1/119
 	cmd.SysProcAttr = &syscall.SysProcAttr{
-		Cloneflags: syscall.CLONE_NEWUTS,
+		Cloneflags:   syscall.CLONE_NEWUTS | syscall.CLONE_NEWPID | syscall.CLONE_NEWNS,
+		Unshareflags: syscall.CLONE_NEWNS,
 	}
+	// CLONE_NEWUTS = hostname  |  CLONE_NEWPID = new namespace for pids  |  CLONE_NEWNS = new namespace
+	// systemd recursively shares mounts with all other namespaces
 
-	// in the demo at first stage running hostname and passing single clone flag, did not work. also ubuntu prompts:
-	// panic: fork/exec /usr/bin/hostname: operation not permitted
-	// ubuntu 20.04 - kernel: Linux wallaby 5.11.0-25-generic #27~20.04.1-Ubuntu SMP Tue Jul 13 17:41:23 UTC 2021 x86_64 x86_64 x86_64 GNU/Linux
 	// had to wrap with must() to make work
 	must(cmd.Run())
-
-	syscall.Sethostname([]byte("container"))
-
 }
 
 func child() {
-	fmt.Printf("Running %v\n", os.Args[2:])
+	fmt.Printf("Running %v as %d\n", os.Args[2:], os.Getpid())
 
-	syscall.Sethostname([]byte("container"))
+	cg()
+
+	syscall.Sethostname([]byte("failwhale"))
+	syscall.Chroot("/home/brandon/tmp_fs")
+	syscall.Chdir("/")
+	syscall.Mount("proc", "proc", "proc", 0, "")
 
 	cmd := exec.Command(os.Args[2], os.Args[3:]...)
-	// wire up stdin, out and err so we can see stuff when we run the cmd
 	cmd.Stdin = os.Stdin
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 
 	must(cmd.Run())
+
+	syscall.Unmount("/proc", 0)
+}
+
+func cg() {
+	// fails right now. /sys/proc does not exist
+	// research where that directory should in ubuntu 20.04. should it be /proc?
+	cgroups := "/sys/proc/cgroup"
+	pids := filepath.Join(cgroups, "pids")
+	err := os.Mkdir(filepath.Join(pids, "failwhale"), 755)
+	if err != nil && !os.IsExist(err) {
+		panic(err)
+	}
+	must(ioutil.WriteFile(filepath.Join(pids, "failwhale/pids.max"), []byte("20"), 0700))
+	// removes new cgroup after container exits
+	must(ioutil.WriteFile(filepath.Join(pids, "failwhale/notify_on_release"), []byte("1"), 0700))
+	must(ioutil.WriteFile(filepath.Join(pids, "failwhale/cgroup.procs"), []byte(strconv.Itoa(os.Getpid())), 0700))
+
 }
 
 func must(err error) {
