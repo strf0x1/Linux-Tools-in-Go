@@ -1,4 +1,4 @@
-## linux_tools_in_go
+## containers in go
 
 This is a simple pseudo-docker clone based on the talk by Liz Rice - Containers From Scratch: https://www.youtube.com/watch?v=8fi7uSYlOdc
 
